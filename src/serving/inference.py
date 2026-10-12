@@ -61,6 +61,9 @@ except Exception as e:
 # This ensures the model receives features in the expected order
 try:
     feature_file = os.path.join(MODEL_DIR, "feature_columns.txt")
+    if not os.path.exists(feature_file):
+        # Local mlruns layout: MLflow logs it beside model/, not inside it
+        feature_file = os.path.join(os.path.dirname(MODEL_DIR), "feature_columns.txt")
     with open(feature_file) as f:
         FEATURE_COLS = [ln.strip() for ln in f if ln.strip()]
     print(f"✅ Loaded {len(FEATURE_COLS)} feature columns from training")
