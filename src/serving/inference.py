@@ -14,7 +14,8 @@ Key Responsibilities:
 
 CRITICAL PATTERN: Training/Serving Consistency
 - Uses fixed BINARY_MAP for deterministic binary encoding
-- Applies same one-hot encoding with drop_first=True
+- One-hot encodes all categories, then aligns to training columns (equivalent to
+  training's drop_first=True, but also correct for single-row input)
 - Maintains exact feature column order from training
 - Handles missing/new categorical values gracefully
 
@@ -32,7 +33,7 @@ import mlflow
 # IMPORTANT: This path is set during Docker container build
 # In development: uses local MLflow artifacts
 # In production: uses model copied to container at build time
-MODEL_DIR = "/app/model"
+MODEL_DIR = os.getenv("MODEL_DIR", "/app/model")  # override for tests / other layouts
 
 try:
     # Load the trained XGBoost model in MLflow pyfunc format
@@ -142,9 +143,10 @@ def _serve_transform(df: pd.DataFrame) -> pd.DataFrame:
     # Find remaining object/categorical columns (not in BINARY_MAP)
     obj_cols = [c for c in df.select_dtypes(include=["object"]).columns]
     if obj_cols:
-        # Apply one-hot encoding with drop_first=True (same as training)
-        # This prevents multicollinearity by dropping the first category
-        df = pd.get_dummies(df, columns=obj_cols, drop_first=True)
+        # Encode ALL categories here (no drop_first): on a single row, drop_first
+        # would drop the row's only value and zero out the feature. The reindex
+        # to FEATURE_COLS below discards the baseline columns training dropped.
+        df = pd.get_dummies(df, columns=obj_cols)
     
     # === STEP 4: Boolean to Integer Conversion ===
     # Convert any boolean columns to integers (XGBoost compatibility)
