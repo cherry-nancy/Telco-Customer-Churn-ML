@@ -27,13 +27,14 @@ API_FIELDS = [
 ]
 
 
-@pytest.fixture
+@pytest.fixture  # a fixture is a resuable test setup data that pytest builds and passes
+# into your tests for you. 
 def raw_df() -> pd.DataFrame:
     """20 real rows covering every category value, both Churn labels and a blank TotalCharges."""
     return pd.read_csv(FIXTURE_CSV)
 
 
-@pytest.fixture
+@pytest.fixture # it builds and returns one sample customer as a Python dictionary.
 def customer() -> dict:
     """One valid /predict payload (high-risk profile from the Gradio examples)."""
     return {
@@ -46,3 +47,4 @@ def customer() -> dict:
         "PaymentMethod": "Electronic check",
         "tenure": 1, "MonthlyCharges": 85.0, "TotalCharges": 85.0,
     }
+
