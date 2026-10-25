@@ -13,15 +13,22 @@ python scripts/run_pipeline.py --input data/raw/Telco-Customer-Churn.csv --targe
 python scripts/prepare_processed_data.py
 ```
 
+### Setup
+```bash
+pip install -r requirements-dev.txt   # training, validation, notebooks, pytest (includes requirements-serve.txt)
+```
+
 ### Testing
 ```bash
-# Test data processing and feature engineering
+# Automated pytest suite (config in pytest.ini: testpaths=tests, pythonpath=.)
+pytest                                   # everything
+pytest tests/test_api.py -v              # one file
+pytest tests/test_api.py::test_health_check   # one test
+pytest -k predict -x -s                  # keyword filter, stop on first failure, show prints
+
+# Older manual scripts (not run by pytest)
 python scripts/test_pipeline_phase1_data_features.py
-
-# Test model training and evaluation
 python scripts/test_pipeline_phase2_modeling.py
-
-# Test FastAPI endpoints
 python scripts/test_fastapi.py
 ```
 
@@ -36,8 +43,8 @@ python -m uvicorn src.app.app:app --host 0.0.0.0 --port 8000
 
 ### Docker
 ```bash
-# Build and run the containerized application
-docker build -t telco-churn-app .
+# Build and run the containerized application (the file is named `dockerfile`, lowercase)
+docker build -f dockerfile -t telco-churn-app .
 docker run -p 8000:8000 telco-churn-app
 ```
 
@@ -80,20 +87,23 @@ Critical pattern: Training and serving must use identical feature transformation
 - **Prediction Format**: Returns "Likely to churn" or "Not likely to churn" strings
 
 ### Data Validation
-- **Tool**: Great Expectations with custom validation suite
-- **Location**: `src/utils/validate_data.py`
-- **Checks**: CustomerID presence, gender values, numeric ranges for tenure/charges
+- **Tool**: Great Expectations (GX 1.x API, ephemeral context) with a custom suite
+- **Location**: `src/utils/validate_data.py` (`validate_telco_data(df) -> (success, failed_expectation_names)`)
+- **Checks**: required columns exist, `customerID` non-null, allowed values for gender/Partner/Dependents/PhoneService/Contract/InternetService, ranges for tenure (0-120), MonthlyCharges (0-200), TotalCharges >= 0, and TotalCharges >= MonthlyCharges for 95% of rows
+- **Note**: `TotalCharges` is coerced to numeric on a copy first (raw data has blank strings for new customers)
+- **Scope**: batch/training-time only. The API's `CustomerData` (Pydantic) uses plain `str` for categorical fields, so serving does not enforce allowed values, only presence and type
 - **Integration**: Results logged to MLflow as `data_quality_pass` metric
 
 ### Docker Containerization
-- **Base Image**: `python:3.11-slim`
-- **Key Setting**: `PYTHONPATH=/app/src` for proper module imports
-- **Model Artifacts**: Specific MLflow run copied to `/app/model` during build
+- **Base Image**: `python:3.11-slim`; installs only `requirements-serve.txt` (dev/training deps are excluded)
+- **Key Settings**: `PYTHONPATH=/app/src` for module imports, `PYTHONUNBUFFERED=1` for live logs
+- **Model Artifacts**: MLflow run `3b1a41221fc44548aed629fa42b762e0` is hard-coded in the `COPY` lines and copied to `/app/model`; retraining means updating the run ID in `dockerfile`
 - **Serving**: uvicorn with FastAPI app on port 8000
 
 ### CI/CD Pipeline
+- **Workflow**: `.github/workflows/ci.yml`
 - **Trigger**: Push to main branch
-- **Actions**: Build Docker image → Push to Docker Hub (`anasriad8/telco-fastapi:latest`)
+- **Actions**: Build Docker image → Push to Docker Hub (`anasriad8/telco-fastapi:latest`). The workflow does not run pytest
 - **Requirements**: `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets
 - **Deployment**: Manual ECS service update (AWS Fargate + ALB)
 
@@ -110,6 +120,10 @@ Optimized hyperparameters are hardcoded in `scripts/run_pipeline.py:100-110`:
 - `/ui` - Gradio interface mounted via `gr.mount_gradio_app()`
 
 ### File System Layout
+- `tests/` - pytest suite: `test_api.py`, `test_features.py`, `test_inference.py`, `test_validate_data.py`
+- `tests/conftest.py` - sets `MODEL_DIR` to the bundled model before `inference.py` is imported (it loads the model at import time) and defines the shared fixtures `raw_df` and `customer`
+- `tests/fixtures/sample_customers.csv` - 20 real rows covering every category value, both Churn labels and a blank TotalCharges
+- `src/` - `app/` (FastAPI + Gradio), `data/`, `features/`, `models/` (train/tune/evaluate), `serving/`, `utils/`
 - `data/raw/` - Original datasets
 - `data/processed/` - Cleaned datasets
 - `mlruns/` - MLflow experiment tracking database
@@ -117,7 +131,8 @@ Optimized hyperparameters are hardcoded in `scripts/run_pipeline.py:100-110`:
 - `src/serving/model/` - Local MLflow run copies for development
 
 ### Development Notes
-- No formal test suite exists; use manual test scripts in `scripts/test_*.py`
+- Automated tests live in `tests/` and run with `pytest`; the `scripts/test_*.py` files are older manual scripts
+- Tests use the model bundled under `src/serving/model/`, so they need no `/app/model` or `mlruns/`
 - MLflow UI can be accessed with: `mlflow ui --backend-store-uri file:./mlruns`
 - The project uses file-based MLflow tracking (not a tracking server)
 - Model serving expects exact feature column order from training time

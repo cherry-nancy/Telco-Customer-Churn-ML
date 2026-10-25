@@ -16,9 +16,9 @@ def _features(raw_df):
 def test_preprocess_cleans_target_and_ids(raw_df):
     df = preprocess_data(raw_df)
     assert "customerID" not in df.columns
-    assert set(df["Churn"].unique()) <= {0, 1}
+    assert set(df["Churn"].unique()) <= {0, 1} # <= means "is a subset of" so this checks that the Churn column only has 0s and 1s, no other values.
     # the fixture has a blank TotalCharges; it must become a number, not NaN
-    assert df["TotalCharges"].notna().all()
+    assert df["TotalCharges"].notna().all() # True only if no row in TotalCharges is missing
 
 
 def test_build_features_all_numeric_no_nans(raw_df):
