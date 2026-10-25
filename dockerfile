@@ -28,14 +28,16 @@ COPY src/serving/model/3b1a41221fc44548aed629fa42b762e0/artifacts/preprocessing.
 # make "serving" and "app" importable without the "src." prefix
 # ensures logs are shown in real-time (no buffering).
 # lets you import modules using from app... instead of from src.app....
-ENV PYTHONUNBUFFERED=1 \   # makes logs appear immediately instead of being 
-# buffered, which helps with docker logs and CloudWatch
-    PYTHONPATH=/app/src  # lets code import app... and serving ... without 
-    # the src. prefix
+# PYTHONUNBUFFERED: logs appear immediately instead of being buffered
+# (helps with docker logs and CloudWatch)
+# PYTHONPATH: lets code import app... and serving... without the src. prefix
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src
 
 # 6. Expose FastAPI port
-EXPOSE 8000  # Dcouments that the app listens on port 8000. It does not 
-# publish the port, you still need docker run -p 8000:8000 to publish it.
+# Documents that the app listens on port 8000. It does not publish the port;
+# you still need docker run -p 8000:8000 to publish it.
+EXPOSE 8000
 
 # 7. Run the FastAPI app using uvicorn (change path if needed)
 CMD ["python", "-m", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
