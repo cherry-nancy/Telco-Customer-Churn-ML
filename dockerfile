@@ -13,8 +13,7 @@ RUN pip install --upgrade pip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*  # cleans the apt cache
 
 # 5. Copy the entire project into the image
- # copies the whole project into /app, minus anything listed in 
-# .dockerignore
+# copies the whole project into /app, minus anything listed in .dockerignore
 COPY . .   
 
 # Explicitly copy model (in case .dockerignore excluded mlruns)
