@@ -25,6 +25,10 @@ def test_build_features_all_numeric_no_nans(raw_df):
     df = _features(raw_df)
     assert df.isna().sum().sum() == 0
     assert all(dtype.kind in "biuf" for dtype in df.dtypes), df.dtypes[df.dtypes == object]
+    # dtype.kind is one-letter code: b=boolean, i=int, u=unsigned int, f=float, c=complex, O=object, S=byte string, U=unicode string, V=void
+    # assert condition, message: when the condition is False, the part after the comma
+    # is shown as the failure message.
+
 
 
 def test_build_features_matches_served_model_schema(raw_df):
